@@ -26,6 +26,13 @@
       <input type="number" id="budget" class="form-control" v-model="budget" placeholder="500">
     </div>
 
+    <!-- 嗜好・条件入力 -->
+    <div class="mb-3">
+      <label for="preference" class="form-label">嗜好・条件（任意）:</label>
+      <input id="preference" type="text" class="form-control" v-model="preference"
+             placeholder="例: カロリー控えめ、中華、和食、糖質制限など">
+    </div>
+
     <!-- 実行ボタン -->
     <div class="mb-3">
       <button @click="generateMenu" class="btn btn-primary">献立を作成</button>
@@ -38,26 +45,58 @@
     <div v-if="menu" class="mt-4">
       <h3>{{ menu.menu_title }}</h3>
 
-      <div v-for="(dish, idx) in menu.dishes" :key="idx" class="card mb-3">
-        <div class="card-body">
-          <h5 class="card-title">{{ dish.name }}</h5>
-          <p><strong>材料:</strong> {{ dish.ingredients.join(", ") }}</p>
-          <p><strong>手順:</strong></p>
-          <ol>
-            <li v-for="(step, i) in dish.steps" :key="i">{{ step }}</li>
-          </ol>
-          <p><strong>カロリー:</strong> {{ dish.calories }} kcal</p>
-          <p>
-            <strong>栄養素:</strong>
-            たんぱく質 {{ dish.nutrition["たんぱく質"] }}g /
-            脂質 {{ dish.nutrition["脂質"] }}g /
-            炭水化物 {{ dish.nutrition["炭水化物"] }}g
-          </p>
+      <!-- 今ある食材だけ -->
+      <div class="mb-4">
+        <h4>① 今ある食材だけで作る献立</h4>
+        <div v-for="(dish, idx) in menu.plan_without_budget.dishes" :key="'wo-' + idx" class="card mb-3">
+          <div class="card-body">
+            <h5 class="card-title">{{ dish.name }}</h5>
+            <p><strong>材料:</strong> {{ dish.ingredients.join(", ") }}</p>
+            <p><strong>手順:</strong></p>
+            <ol>
+              <li v-for="(step, i) in dish.steps" :key="i">{{ step }}</li>
+            </ol>
+            <p><strong>カロリー:</strong> {{ dish.calories }} kcal</p>
+            <p>
+              <strong>栄養素:</strong>
+              たんぱく質 {{ dish.nutrition["たんぱく質"] }}g /
+              脂質 {{ dish.nutrition["脂質"] }}g /
+              炭水化物 {{ dish.nutrition["炭水化物"] }}g
+            </p>
+          </div>
         </div>
+        <p><strong>合計カロリー:</strong> {{ menu.plan_without_budget.total_calories }} kcal</p>
+        <p><em>{{ menu.plan_without_budget.notes }}</em></p>
       </div>
 
-      <p><strong>合計カロリー:</strong> {{ menu.total_calories }} kcal</p>
-      <p><em>{{ menu.notes }}</em></p>
+      <!-- 予算を使う場合 -->
+      <div class="mb-4">
+        <h4>② 予算を使った献立</h4>
+        <div v-if="menu.plan_with_budget.dishes && menu.plan_with_budget.dishes.length > 0">
+          <div v-for="(dish, idx) in menu.plan_with_budget.dishes" :key="'wb-' + idx" class="card mb-3">
+            <div class="card-body">
+              <h5 class="card-title">{{ dish.name }}</h5>
+              <p><strong>材料:</strong> {{ dish.ingredients.join(", ") }}</p>
+              <p><strong>手順:</strong></p>
+              <ol>
+                <li v-for="(step, i) in dish.steps" :key="i">{{ step }}</li>
+              </ol>
+              <p><strong>カロリー:</strong> {{ dish.calories }} kcal</p>
+              <p>
+                <strong>栄養素:</strong>
+                たんぱく質 {{ dish.nutrition["たんぱく質"] }}g /
+                脂質 {{ dish.nutrition["脂質"] }}g /
+                炭水化物 {{ dish.nutrition["炭水化物"] }}g
+              </p>
+            </div>
+          </div>
+          <p><strong>合計カロリー:</strong> {{ menu.plan_with_budget.total_calories }} kcal</p>
+          <p><em>{{ menu.plan_with_budget.notes }}</em></p>
+        </div>
+        <div v-else>
+          <p><em>{{ menu.plan_with_budget.notes }}</em></p>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -69,6 +108,7 @@
         return {
           ingredientsText: "",
           budget: "",
+          preference: "",
           menu: null,
           loading: false,
           error: null
@@ -91,7 +131,8 @@
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 ingredients: ingredients,
-                budget: this.budget ? parseInt(this.budget) : null
+                budget: this.budget ? parseInt(this.budget) : null,
+                preference: this.preference || null
               })
             });
 

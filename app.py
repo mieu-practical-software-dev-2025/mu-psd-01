@@ -36,23 +36,35 @@ client = OpenAI(
 # ----------------------------------------
 SYSTEM_PROMPT = """
 あなたは栄養士兼料理研究家のAIアシスタントです。
-ユーザーが指定した食材と、必要なら予算内での追加食材を使い、
-栄養バランスの良い夕食の献立を提案してください。
+
+ユーザーが指定した食材と嗜好条件から、以下の2種類の献立を提案してください:
+
+1. 今ある食材だけで作る献立 (plan_without_budget)
+2. 予算が指定されている場合、追加食材を考慮した献立 (plan_with_budget)
+   - 栄養や彩りを改善するために新しい食材を提案すること
+   - ただし予算内で有効な提案が難しい場合は「予算内で追加できる献立はありません」とすること
 
 必ず次のJSONフォーマットで返答してください:
 {
   "menu_title": "献立タイトル",
-  "dishes": [
-    {
-      "name": "料理名",
-      "ingredients": ["食材A", "食材B"],
-      "steps": ["手順1", "手順2"],
-      "calories": 数値,
-      "nutrition": {"たんぱく質": g, "脂質": g, "炭水化物": g}
-    }
-  ],
-  "total_calories": 数値,
-  "notes": "補足説明"
+  "plan_without_budget": {
+    "dishes": [
+      {
+        "name": "料理名",
+        "ingredients": [...],
+        "steps": [...],
+        "calories": 数値,
+        "nutrition": {"たんぱく質": g, "脂質": g, "炭水化物": g}
+      }
+    ],
+    "total_calories": 数値,
+    "notes": "補足説明"
+  },
+  "plan_with_budget": {
+    "dishes": [... または空配列 ...],
+    "total_calories": 数値 または 0,
+    "notes": "補足説明 または '予算内で追加できる献立はありません。'"
+  }
 }
 """
 
@@ -64,47 +76,29 @@ SYSTEM_PROMPT = """
 def index():
     return send_from_directory(app.static_folder, "index.html")
 
-
 # ----------------------------------------
 # メインAPI: 献立生成
-# POST /generate_menu
-# 入力JSON例:
-# {
-#   "ingredients": ["じゃがいも", "玉ねぎ", "鶏肉"],
-#   "budget": 500
-# }
-# 出力JSON例:
-# {
-#   "menu_title": "鶏肉と野菜の和定食",
-#   "dishes": [
-#       {"name": "鶏肉の照り焼き", "ingredients": ["鶏肉","醤油"], "steps":["焼く","味付け"], "calories":320, "nutrition":{"たんぱく質":25,"脂質":15,"炭水化物":12}},
-#       {"name": "味噌汁", "ingredients": ["玉ねぎ","味噌"], "steps":["煮る","味噌を溶かす"], "calories":120, "nutrition":{"たんぱく質":3,"脂質":2,"炭水化物":18}}
-#   ],
-#   "total_calories": 440,
-#   "notes": "不足栄養素を補うために小鉢を追加するとさらに良いです。"
-# }
 # ----------------------------------------
 @app.route("/generate_menu", methods=["POST"])
 def generate_menu():
     data = request.get_json()
 
-    # --- 入力チェック ---
     if not data or not isinstance(data.get("ingredients"), list) or not data.get("ingredients"):
         return jsonify({"error": "Missing 'ingredients' in request body"}), 400
 
     ingredients = data["ingredients"]
-    budget = data.get("budget")  # 予算は任意
+    budget = data.get("budget")
+    preference = data.get("preference")
 
     # --- AIに投げるプロンプト ---
     user_prompt = f"""
     食材: {ingredients}
     追加予算: {budget if budget else "なし"}
+    ユーザーの嗜好・条件: {preference if preference else "特になし"}
     JSON形式で献立を返してください。
     """
 
     try:
-        # --- OpenRouter API呼び出し ---
-        # response_formatでJSONモードを有効化
         response = client.chat.completions.create(
             model=CHAT_MODEL,
             messages=[
@@ -117,24 +111,22 @@ def generate_menu():
 
         ai_response_text = response.choices[0].message.content
 
-        # --- JSONとしてパース ---
-        # JSONモードでも稀に失敗する可能性を考慮し、エラーハンドリングは残す
         try:
             menu_data = json.loads(ai_response_text)
         except json.JSONDecodeError:
-            return jsonify({"error": "AI response was not valid JSON despite requesting JSON format.", "raw": ai_response_text}), 500
+            return jsonify({
+                "error": "AI response was not valid JSON despite requesting JSON format.",
+                "raw": ai_response_text
+            }), 500
 
         return jsonify(menu_data)
 
     except APIStatusError as e:
-        # APIからのエラーステータス（認証エラー、リクエストエラーなど）
         return jsonify({"error": f"OpenRouter API error: {e.status_code} {e.response.text}"}), e.status_code
     except APIConnectionError as e:
-        # ネットワーク関連のエラー
         return jsonify({"error": f"Failed to connect to OpenRouter API: {str(e)}"}), 503
     except Exception as e:
         return jsonify({"error": f"API call failed: {str(e)}"}), 500
-
 
 # ----------------------------------------
 # サーバ起動
