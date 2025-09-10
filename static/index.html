@@ -8,10 +8,16 @@
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <!-- Bootstrap (CSSフレームワーク) をCDNから読み込み -->
   <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css">
+  <style>
+    /* Vue.jsが初期化されるまで、v-cloak属性を持つ要素を非表示にする */
+    [v-cloak] {
+      display: none;
+    }
+  </style>
 </head>
 <body>
   <!-- Vueアプリケーションがマウントされるルート要素。このdiv内でVueの機能が有効になる -->
-  <div id="app" class="container my-4">
+  <div id="app" class="container my-4" v-cloak>
     <h2 class="mb-4">みんなの献立アドバイザー</h2>
 
     <!-- 入力フォームセクション -->
