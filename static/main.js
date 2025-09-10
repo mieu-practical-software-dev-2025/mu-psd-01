@@ -35,6 +35,14 @@ const app = createApp({
       this.error = null;
       this.menu = null;
 
+      // --- フロントエンドでの入力チェック強化 ---
+      // 予算が入力されていて、かつ0未満の数値である場合はエラー
+      if (this.budget && this.budget < 0) {
+        this.error = "予算には0以上の数値を入力してください。";
+        this.loading = false; // ローディングを解除
+        return;
+      }
+
       try {
         // --- 入力値の整形とバリデーション ---
         // 入力された食材テキストをカンマで分割し、各要素の空白を除去し、空の要素をフィルタリング
@@ -46,6 +54,7 @@ const app = createApp({
         // 食材が1つも入力されていない場合はエラーメッセージを設定して処理を中断
         if (ingredients.length === 0) {
           this.error = "食材を1つ以上入力してください。";
+          this.loading = false; // ローディングを解除
           return;
         }
 
@@ -56,7 +65,7 @@ const app = createApp({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ingredients: ingredients,
-            budget: this.budget ? parseInt(this.budget) : null,
+            budget: (this.budget === '' || this.budget === null) ? null : this.budget,
             preference: this.preference || null,
           }),
         });
@@ -96,21 +105,27 @@ app.component("dish-card", {
   },
   // コンポーネントのHTML構造
   template: `
-    <div class="card mb-3">
+    <div class="card mb-3 shadow-sm">
+      <div class="card-header bg-primary bg-opacity-75 text-white">
+        <h5 class="card-title mb-0">{{ dish.name }}</h5>
+      </div>
       <div class="card-body">
-        <h5 class="card-title">{{ dish.name }}</h5>
         <p><strong>材料:</strong> {{ dish.ingredients.join(", ") }}</p>
-        <p><strong>手順:</strong></p>
-        <ol>
+        <p class="mb-1"><strong>手順:</strong></p>
+        <ol class="ps-3">
           <li v-for="(step, i) in dish.steps" :key="i">{{ step }}</li>
         </ol>
-        <p><strong>カロリー:</strong> {{ dish.calories }} kcal</p>
-        <p v-if="dish.nutrition">
-          <strong>栄養素:</strong>
-          たんぱく質 {{ dish.nutrition["たんぱく質"] }} /
-          脂質 {{ dish.nutrition["脂質"] }} /
-          炭水化物 {{ dish.nutrition["炭水化物"] }}
-        </p>
+      </div>
+      <div class="card-footer bg-light">
+        <small class="text-muted">
+          <strong>カロリー:</strong> {{ dish.calories }} kcal
+          <span v-if="dish.nutrition" class="ms-3">
+            <strong>栄養素:</strong>
+            P: {{ dish.nutrition["たんぱく質"] }} /
+            F: {{ dish.nutrition["脂質"] }} /
+            C: {{ dish.nutrition["炭水化物"] }}
+          </span>
+        </small>
       </div>
     </div>
   `,
@@ -124,19 +139,61 @@ app.component("menu-plan", {
     // 'plan': 献立プランのデータオブジェクト
     plan: { type: Object, required: true },
   },
+  // コンポーネント自身の状態を管理するデータ
+  data() {
+    return {
+      copied: false, // 「コピーしました！」のフィードバック表示用
+    };
+  },
+  methods: {
+    // 買い物リストをクリップボードにコピーするメソッド
+    copyShoppingList() {
+      if (!this.plan.shopping_list || this.copied) return;
+      // リストの各項目を改行で連結してテキストを作成
+      const listText = this.plan.shopping_list.join('\n');
+      // クリップボードへの書き込み
+      navigator.clipboard.writeText(listText).then(() => {
+        this.copied = true; // 成功したら表示を切り替え
+        // 2秒後に表示を元に戻す
+        setTimeout(() => {
+          this.copied = false;
+        }, 2000);
+      });
+    }
+  },
   template: `
-    <div class="mb-4">
-      <h4>{{ title }}</h4>
+    <div class="mb-5">
+      <h4 class="plan-title mb-4">{{ title }}</h4>
       <!-- planデータがあり、料理リスト(dishes)に1つ以上の料理が含まれている場合に表示 -->
       <div v-if="plan && plan.dishes && plan.dishes.length > 0">
         <!-- 料理リストをループして、各料理を'dish-card'コンポーネントで表示 -->
         <dish-card v-for="(dish, idx) in plan.dishes" :key="idx" :dish="dish"></dish-card>
-        <p><strong>合計カロリー:</strong> {{ plan.total_calories }} kcal</p>
-        <p><em>{{ plan.notes }}</em></p>
+
+        <div class="alert alert-success mt-4">
+          <p class="mb-1"><strong>合計カロリー:</strong> {{ plan.total_calories }} kcal</p>
+          <hr>
+          <p class="mb-0"><em>{{ plan.notes }}</em></p>
+        </div>
+
+        <!-- 買い物リストのカード -->
+        <div v-if="plan.shopping_list && plan.shopping_list.length > 0" class="card mt-4">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">買い物リスト</h5>
+            <button class="btn btn-sm btn-outline-primary" @click="copyShoppingList" :disabled="copied">
+              <span v-if="!copied">リストをコピー</span>
+              <span v-else>コピーしました！</span>
+            </button>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li v-for="item in plan.shopping_list" :key="item" class="list-group-item">
+              {{ item }}
+            </li>
+          </ul>
+        </div>
       </div>
       <!-- 料理リストが空の場合でも、planデータ自体は存在する場合 (例: 予算内で提案なし) -->
       <div v-else-if="plan">
-        <p><em>{{ plan.notes }}</em></p>
+        <div class="alert alert-secondary"><em>{{ plan.notes }}</em></div>
       </div>
     </div>
   `,

@@ -13,12 +13,32 @@
     [v-cloak] {
       display: none;
     }
+    /* --- カスタムスタイル --- */
+    body {
+      background-color: #f8f9fa; /* 少し明るい背景色 */
+    }
+    #app {
+      background-color: white;
+      border-radius: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .card {
+      transition: transform 0.2s ease-in-out;
+    }
+    .card:hover {
+      transform: translateY(-5px); /* カードにマウスを乗せると少し浮き上がる */
+    }
+    .plan-title {
+      border-bottom: 2px solid #0d6efd; /* プランタイトルの下線 */
+      padding-bottom: 0.5rem;
+      color: #0d6efd;
+    }
   </style>
 </head>
 <body>
   <!-- Vueアプリケーションがマウントされるルート要素。このdiv内でVueの機能が有効になる -->
-  <div id="app" class="container my-4" v-cloak>
-    <h2 class="mb-4">みんなの献立アドバイザー</h2>
+  <div id="app" class="container my-5 p-4 p-md-5" v-cloak>
+    <h2 class="text-center text-primary mb-5">みんなの献立アドバイザー</h2>
 
     <!-- 入力フォームセクション -->
 
@@ -34,7 +54,7 @@
     <div class="mb-3">
       <label for="budget" class="form-label">予算（円・任意）:</label>
       <!-- v-model="budget": Vueインスタンスの`budget`データと双方向バインディング -->
-      <input v-model="budget" type="number" id="budget" class="form-control" placeholder="500">
+      <input v-model.number="budget" type="number" id="budget" class="form-control" placeholder="500" min="0">
     </div>
 
     <!-- 嗜好・条件入力 -->
@@ -49,13 +69,15 @@
     <div class="mb-3">
       <!-- @click="generateMenu": クリック時にVueインスタンスの`generateMenu`メソッドを実行 -->
       <!-- :disabled="loading": `loading`データがtrueの間、ボタンを無効化する -->
-      <button class="btn btn-primary" @click="generateMenu" :disabled="loading">献立を作成</button>
+      <button class="btn btn-primary btn-lg w-100" @click="generateMenu" :disabled="loading">
+        <span v-if="loading" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        <span v-if="loading"> 作成中...</span>
+        <span v-else>献立を作成</span>
+      </button>
     </div>
 
     <!-- 結果表示セクション -->
 
-    <!-- v-if="loading": `loading`データがtrueの場合のみ、この要素を表示 -->
-    <div v-if="loading" class="alert alert-info">献立を生成中です...</div>
     <!-- v-if="error": `error`データに値がある場合のみ、この要素を表示 -->
     <div v-if="error" class="alert alert-danger">{{ error }}</div>
 
@@ -76,11 +98,23 @@
         title="② 予算を使った献立"
         :plan="menu.plan_with_budget">
       </menu-plan>
+
+      <!-- 調味料リスト -->
+      <div v-if="menu && menu.seasonings_used && menu.seasonings_used.length > 0" class="card mt-4">
+        <div class="card-header">
+          <h5 class="mb-0">使用する調味料リスト（買い忘れチェック！）</h5>
+        </div>
+        <ul class="list-group list-group-flush">
+          <li v-for="item in menu.seasonings_used" :key="item" class="list-group-item">
+            {{ item }}
+          </li>
+        </ul>
+      </div>
     </div>
   </div>
 
   <!-- 外部JavaScriptファイルを読み込み。Vueのロジックが記述されている -->
   <!-- defer属性により、HTMLのパース完了後にスクリプトが実行される -->
-  <script src="/js/main.js" defer></script>
+  <script src="/main.js" defer></script>
 </body>
 </html>
