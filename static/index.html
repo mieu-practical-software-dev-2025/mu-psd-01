@@ -4,152 +4,77 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>みんなの献立アドバイザー</title>
-  <!-- Vue.js CDN -->
+  <!-- Vue.jsライブラリをCDNから読み込み -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-  <!-- Bootstrap CDN -->
+  <!-- Bootstrap (CSSフレームワーク) をCDNから読み込み -->
   <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css">
 </head>
 <body>
+  <!-- Vueアプリケーションがマウントされるルート要素。このdiv内でVueの機能が有効になる -->
   <div id="app" class="container my-4">
     <h2 class="mb-4">みんなの献立アドバイザー</h2>
+
+    <!-- 入力フォームセクション -->
 
     <!-- 食材入力 -->
     <div class="mb-3">
       <label for="ingredients" class="form-label">食材（カンマ区切り）:</label>
-      <textarea id="ingredients" class="form-control" rows="3" v-model="ingredientsText"
+      <!-- v-model="ingredientsText": Vueインスタンスの`ingredientsText`データと双方向バインディング -->
+      <textarea v-model="ingredientsText" id="ingredients" class="form-control" rows="3"
         placeholder="例: 鶏肉, 玉ねぎ, じゃがいも"></textarea>
     </div>
 
     <!-- 予算入力 -->
     <div class="mb-3">
       <label for="budget" class="form-label">予算（円・任意）:</label>
-      <input type="number" id="budget" class="form-control" v-model="budget" placeholder="500">
+      <!-- v-model="budget": Vueインスタンスの`budget`データと双方向バインディング -->
+      <input v-model="budget" type="number" id="budget" class="form-control" placeholder="500">
     </div>
 
     <!-- 嗜好・条件入力 -->
     <div class="mb-3">
       <label for="preference" class="form-label">嗜好・条件（任意）:</label>
-      <input id="preference" type="text" class="form-control" v-model="preference"
+      <!-- v-model="preference": Vueインスタンスの`preference`データと双方向バインディング -->
+      <input v-model="preference" id="preference" type="text" class="form-control"
              placeholder="例: カロリー控えめ、中華、和食、糖質制限など">
     </div>
 
     <!-- 実行ボタン -->
     <div class="mb-3">
-      <button @click="generateMenu" class="btn btn-primary">献立を作成</button>
+      <!-- @click="generateMenu": クリック時にVueインスタンスの`generateMenu`メソッドを実行 -->
+      <!-- :disabled="loading": `loading`データがtrueの間、ボタンを無効化する -->
+      <button class="btn btn-primary" @click="generateMenu" :disabled="loading">献立を作成</button>
     </div>
 
-    <!-- 結果表示 -->
+    <!-- 結果表示セクション -->
+
+    <!-- v-if="loading": `loading`データがtrueの場合のみ、この要素を表示 -->
     <div v-if="loading" class="alert alert-info">献立を生成中です...</div>
+    <!-- v-if="error": `error`データに値がある場合のみ、この要素を表示 -->
     <div v-if="error" class="alert alert-danger">{{ error }}</div>
 
+    <!-- v-if="menu": `menu`データに値がある場合のみ、この要素（献立全体）を表示 -->
     <div v-if="menu" class="mt-4">
       <h3>{{ menu.menu_title }}</h3>
 
-      <!-- 今ある食材だけ -->
-      <div class="mb-4">
-        <h4>① 今ある食材だけで作る献立</h4>
-        <div v-for="(dish, idx) in menu.plan_without_budget.dishes" :key="'wo-' + idx" class="card mb-3">
-          <div class="card-body">
-            <h5 class="card-title">{{ dish.name }}</h5>
-            <p><strong>材料:</strong> {{ dish.ingredients.join(", ") }}</p>
-            <p><strong>手順:</strong></p>
-            <ol>
-              <li v-for="(step, i) in dish.steps" :key="i">{{ step }}</li>
-            </ol>
-            <p><strong>カロリー:</strong> {{ dish.calories }} kcal</p>
-            <p>
-              <strong>栄養素:</strong>
-              たんぱく質 {{ dish.nutrition["たんぱく質"] }}g /
-              脂質 {{ dish.nutrition["脂質"] }}g /
-              炭水化物 {{ dish.nutrition["炭水化物"] }}g
-            </p>
-          </div>
-        </div>
-        <p><strong>合計カロリー:</strong> {{ menu.plan_without_budget.total_calories }} kcal</p>
-        <p><em>{{ menu.plan_without_budget.notes }}</em></p>
-      </div>
+      <!-- 今ある食材だけで作る献立プラン -->
+      <!-- 'menu-plan'はmain.jsで定義したカスタムコンポーネント -->
+      <!-- :title, :plan はコンポーネントに渡すプロパティ(props) -->
+      <menu-plan
+        title="① 今ある食材だけで作る献立"
+        :plan="menu.plan_without_budget">
+      </menu-plan>
 
-      <!-- 予算を使う場合 -->
-      <div class="mb-4">
-        <h4>② 予算を使った献立</h4>
-        <div v-if="menu.plan_with_budget.dishes && menu.plan_with_budget.dishes.length > 0">
-          <div v-for="(dish, idx) in menu.plan_with_budget.dishes" :key="'wb-' + idx" class="card mb-3">
-            <div class="card-body">
-              <h5 class="card-title">{{ dish.name }}</h5>
-              <p><strong>材料:</strong> {{ dish.ingredients.join(", ") }}</p>
-              <p><strong>手順:</strong></p>
-              <ol>
-                <li v-for="(step, i) in dish.steps" :key="i">{{ step }}</li>
-              </ol>
-              <p><strong>カロリー:</strong> {{ dish.calories }} kcal</p>
-              <p>
-                <strong>栄養素:</strong>
-                たんぱく質 {{ dish.nutrition["たんぱく質"] }}g /
-                脂質 {{ dish.nutrition["脂質"] }}g /
-                炭水化物 {{ dish.nutrition["炭水化物"] }}g
-              </p>
-            </div>
-          </div>
-          <p><strong>合計カロリー:</strong> {{ menu.plan_with_budget.total_calories }} kcal</p>
-          <p><em>{{ menu.plan_with_budget.notes }}</em></p>
-        </div>
-        <div v-else>
-          <p><em>{{ menu.plan_with_budget.notes }}</em></p>
-        </div>
-      </div>
+      <!-- 予算を使った献立プラン -->
+      <menu-plan
+        title="② 予算を使った献立"
+        :plan="menu.plan_with_budget">
+      </menu-plan>
     </div>
   </div>
 
-  <script>
-    const { createApp } = Vue;
-
-    createApp({
-      data() {
-        return {
-          ingredientsText: "",
-          budget: "",
-          preference: "",
-          menu: null,
-          loading: false,
-          error: null
-        };
-      },
-      methods: {
-        async generateMenu() {
-          this.loading = true;
-          this.error = null;
-          this.menu = null;
-
-          try {
-            const ingredients = this.ingredientsText
-              .split(",")
-              .map(s => s.trim())
-              .filter(Boolean);
-
-            const res = await fetch("/generate_menu", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                ingredients: ingredients,
-                budget: this.budget ? parseInt(this.budget) : null,
-                preference: this.preference || null
-              })
-            });
-
-            const data = await res.json();
-            if (!res.ok) {
-              this.error = data.error || "不明なエラーが発生しました。";
-            } else {
-              this.menu = data;
-            }
-          } catch (err) {
-            this.error = "通信エラー: " + err.message;
-          } finally {
-            this.loading = false;
-          }
-        }
-      }
-    }).mount("#app");
-  </script>
+  <!-- 外部JavaScriptファイルを読み込み。Vueのロジックが記述されている -->
+  <!-- defer属性により、HTMLのパース完了後にスクリプトが実行される -->
+  <script src="/js/main.js" defer></script>
 </body>
 </html>
